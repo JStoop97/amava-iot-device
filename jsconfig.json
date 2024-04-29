@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
+    "baseUrl": "./",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "aws-iot-device-sdk-v2": ["node_modules/aws-iot-device-sdk-v2/dist/browser"]
     }
   },
   "exclude": ["node_modules", "dist"]
