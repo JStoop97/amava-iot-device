@@ -1,11 +1,8 @@
 <script setup>
 import { useLedStore } from './stores/stores.js'
-// import { JSON }
-// import { Buffer } from 'util'
 const led = useLedStore()
 
-import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane"; // ES Modules import
-
+import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane" // ES Modules import
 
 const creds = {
     accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
