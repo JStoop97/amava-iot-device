@@ -1,46 +1,71 @@
 <script setup>
-import { useLedStore } from './stores/stores.js'
+import { useLedStore, usePotStore } from './stores/stores.js'
+import { mqtt } from 'aws-iot-device-sdk-v2'
+import { iot } from 'aws-iot-device-sdk-v2'
+
 const led = useLedStore()
+const pot = usePotStore()
 
-import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane" // ES Modules import
+var endpoint = "a1rxjqrwt89eaj-ats.iot.eu-central-1.amazonaws.com"
 
-const creds = {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY
-};
+function build_connection() {
+    let config_builder = iot.AwsIotMqttConnectionConfigBuilder.new_default_builder();
+    config_builder.with_custom_authorizer(
+      "test-browser",
+      "",
+      "",
+      "test"
+    )
+    config_builder.with_clean_session(true)
+    config_builder.with_client_id(`custom_authorizer_connect_sample(${new Date()})`)
+    config_builder.with_endpoint(endpoint)
+    config_builder.with_keep_alive_seconds(30)
+    const config = config_builder.build()
 
-const client = new IoTDataPlaneClient({
-  tls: true,
-  region: "eu-central-1",
-  credentials: creds
+    const client = new mqtt.MqttClient()
+    return client.new_connection(config)
+}
+
+var client = build_connection()
+var pot_value
+client.on("connect", (session_present) => {
+    console.log("connected")
+    client.subscribe( 
+      "/filter/PotSubPubLED",
+      mqtt.QoS.AtLeastOnce,
+      (topic, payload, dup, qos, retain) => {
+        const decoder = new TextDecoder("utf8");
+        let message = decoder.decode(new Uint8Array(payload));
+        let message_json = JSON.parse(message)
+        console.log(`potValue ${message_json.potSensor.potValue}`)
+        pot_value = message_json.potSensor.potValue
+        pot.value_percent = pot_value
+      })
+    });
+client.on("interrupt", (error) => {
+  console.log(`Connection interrupted: error=${error}`);
 });
-
+client.on("resume", (return_code, session_present) => {
+  console.log(`Resumed: rc: ${return_code} existing session: ${session_present}`);
+});
+client.on("disconnect", () => {
+  console.log("Disconnected");
+});
+client.on("error", (error) => {
+  console.log(error)
+});
 
 function update_led(value)
 {
-  console.log("update_led")
-  // if (value == 0)
-  // {
-    let led_json = JSON.parse('{' +
+  let led_json = JSON.parse('{' +
     '"led": {' +
     '"power": '+ Number(value).toString() + 
     '}'+ 
     '}')
-    console.log("sending json: " + JSON.stringify(led_json))
-    var payload = new TextEncoder().encode(JSON.stringify(led_json))
-    var payload = new TextEncoder().encode(JSON.stringify(led_json))
-        const input = { // PublishRequest
-      topic: "/filter/PotSubPubLED", // required
-      qos: 0,
-      retain: false,
-      payload: payload, // e.g. Buffer.from("") or new TextEncoder().encode("")
-      payloadFormatIndicator: "UTF8_DATA",
-    };
-    const command = new PublishCommand(input)
-    client.send(command)
-
+  client.publish(
+    "/filter/PotSubPubLED", led_json, mqtt.QoS.AtLeastOnce
+  )
 }
-
 </script>
 
 <template>
@@ -57,8 +82,15 @@ function update_led(value)
   </header>
 
   <main>
-    <v-switch label="LED" v-model="led.cond" v-on:update:model-value="update_led"></v-switch>
+    <v-switch label="LED" v-model="led.cond" v-on:update:model-value="update_led" thumb-label="always"></v-switch>
     <h3>led value: {{led.cond}}</h3>
+    <v-slider
+    max="100"
+    min="0"
+    readonly
+    v-model="pot.value_percent"
+    ></v-slider>
+    <h3>pot value: {{pot.value_round}}</h3>
   </main>
 </template>
 
