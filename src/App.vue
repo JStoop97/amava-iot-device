@@ -8,13 +8,14 @@ const pot = usePotStore()
 
 var endpoint = "a1rxjqrwt89eaj-ats.iot.eu-central-1.amazonaws.com"
 
+// Connect to AWS IoT Core
 function build_connection() {
     let config_builder = iot.AwsIotMqttConnectionConfigBuilder.new_default_builder();
     config_builder.with_custom_authorizer(
-      "test-browser",
-      "",
-      "",
-      "test"
+      "test-browser", // client id
+      "", // custom authorizer name (none given so use default)
+      "", // custom authorizer password (none given)
+      "test" // password (should be made stronger)
     )
     config_builder.with_clean_session(true)
     config_builder.with_client_id(`custom_authorizer_connect_sample(${new Date()})`)
@@ -29,15 +30,16 @@ function build_connection() {
 var client = build_connection()
 var pot_value
 client.on("connect", (session_present) => {
-    console.log("connected")
-    client.subscribe( 
+  console.log("connected")
+// set up subscription
+  client.subscribe( 
       "/filter/PotSubPubLED",
       mqtt.QoS.AtLeastOnce,
       (topic, payload, dup, qos, retain) => {
         const decoder = new TextDecoder("utf8");
         let message = decoder.decode(new Uint8Array(payload));
-        let message_json = JSON.parse(message)
-        console.log(`potValue ${message_json.potSensor.potValue}`)
+        let message_json = JSON.parse(message) // decode JSON received
+        // console.log(`potValue ${message_json.potSensor.potValue}`)
         pot_value = message_json.potSensor.potValue
         pot.value_percent = pot_value
       })
@@ -55,6 +57,8 @@ client.on("error", (error) => {
   console.log(error)
 });
 
+
+// callback for updating led by publishing to topic
 function update_led(value)
 {
   let led_json = JSON.parse('{' +
@@ -82,8 +86,10 @@ function update_led(value)
   </header>
 
   <main>
+    <!-- switch and slider setup here -->
     <v-switch label="LED" v-model="led.cond" v-on:update:model-value="update_led" thumb-label="always"></v-switch>
     <h3>led value: {{led.cond}}</h3>
+    
     <v-slider
     max="100"
     min="0"
